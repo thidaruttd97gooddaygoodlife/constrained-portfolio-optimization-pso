@@ -1,0 +1,17 @@
+# Python env
+.venv/
+.venv-1/
+
+# Bytecode/cache
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+
