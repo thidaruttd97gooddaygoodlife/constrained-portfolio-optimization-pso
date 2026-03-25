@@ -32,7 +32,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from pyswarm import pso
 
 
 # =============================
@@ -276,59 +275,124 @@ def constraint_penalty(weights: np.ndarray) -> float:
 # 4) PSO optimization
 # =============================
 
-def optimize_portfolio_pso(mu_annual: pd.Series, cov_annual: pd.DataFrame) -> Tuple[np.ndarray, float, pd.DataFrame]:
+def _run_pso_single(
+    objective_fn,
+    lb: np.ndarray,
+    ub: np.ndarray,
+    swarmsize: int,
+    maxiter: int,
+    omega_start: float = 0.9,
+    omega_end: float = 0.4,
+    phip: float = 1.5,
+    phig: float = 1.5,
+    seed: int = 42,
+) -> Tuple[np.ndarray, float, List[float]]:
     """
-    Run PSO on a mixed encoding:
+    Custom PSO loop with:
+    - Linearly Decreasing Inertia Weight (omega: 0.9 -> 0.4)
+      Explores broadly early, exploits precisely late.
+    - Per-iteration convergence history recording.
+
+    Returns: (best_position, best_fitness, convergence_history)
+    """
+    np.random.seed(seed)
+    n_dim = len(lb)
+
+    # Initialize swarm positions uniformly in [lb, ub]
+    X = lb + np.random.rand(swarmsize, n_dim) * (ub - lb)
+    V = np.zeros((swarmsize, n_dim))
+
+    # Evaluate initial fitness
+    fitness = np.array([objective_fn(X[i]) for i in range(swarmsize)])
+
+    pbest_X = X.copy()
+    pbest_f = fitness.copy()
+
+    gbest_idx = int(np.argmin(pbest_f))
+    gbest_X = pbest_X[gbest_idx].copy()
+    gbest_f = float(pbest_f[gbest_idx])
+
+    convergence: List[float] = []
+
+    for it in range(maxiter):
+        # Linearly decrease omega from omega_start to omega_end
+        omega = omega_start - (omega_start - omega_end) * it / max(maxiter - 1, 1)
+
+        r1 = np.random.rand(swarmsize, n_dim)
+        r2 = np.random.rand(swarmsize, n_dim)
+
+        V = (
+            omega * V
+            + phip * r1 * (pbest_X - X)
+            + phig * r2 * (gbest_X - X)
+        )
+        X = np.clip(X + V, lb, ub)
+
+        fitness = np.array([objective_fn(X[i]) for i in range(swarmsize)])
+
+        improved = fitness < pbest_f
+        pbest_X[improved] = X[improved].copy()
+        pbest_f[improved] = fitness[improved]
+
+        best_idx = int(np.argmin(pbest_f))
+        if pbest_f[best_idx] < gbest_f:
+            gbest_f = float(pbest_f[best_idx])
+            gbest_X = pbest_X[best_idx].copy()
+
+        # Record best Sharpe this iteration (negate because we minimized -Sharpe)
+        convergence.append(-gbest_f)
+
+    return gbest_X, gbest_f, convergence
+
+
+def optimize_portfolio_pso(
+    mu_annual: pd.Series, cov_annual: pd.DataFrame
+) -> Tuple[np.ndarray, float, pd.DataFrame, List[List[float]]]:
+    """
+    Run multi-restart PSO on a mixed 2N encoding:
     - First N genes: raw positive scores for weights
     - Next N genes: selection scores to choose exactly K assets via top-K
 
-    Objective minimized by PSO:
-    -negative_sharpe + penalty
+    Returns: (best_weights, best_objective, run_history_df, convergence_histories)
+    convergence_histories[i] = list of best Sharpe per iteration for run i
     """
     mu = mu_annual.values
     cov = cov_annual.values
     n_assets = len(mu)
 
-    # Search bounds for genes
-    lb = np.array([0.0] * (2 * n_assets), dtype=float)
-    ub = np.array([1.0] * (2 * n_assets), dtype=float)
+    lb = np.zeros(2 * n_assets, dtype=float)
+    ub = np.ones(2 * n_assets, dtype=float)
 
     def objective(x: np.ndarray) -> float:
         raw_weight_genes = x[:n_assets]
         selection_genes = x[n_assets:]
-
         w = project_weights_with_cardinality(raw_weight_genes, selection_genes)
         stats = portfolio_performance(w, mu, cov)
+        return -stats.sharpe_ratio + constraint_penalty(w)
 
-        # Maximize Sharpe -> minimize negative Sharpe
-        base_loss = -stats.sharpe_ratio
-
-        # Add constraint penalties for robust feasibility
-        penalty = constraint_penalty(w)
-        return base_loss + penalty
-
-    print(f"Running PSO optimization... (swarm={SWARM_SIZE}, iterations={MAX_ITER}, restarts={PSO_RESTARTS})")
+    print(f"Running custom PSO... (swarm={SWARM_SIZE}, iterations={MAX_ITER}, restarts={PSO_RESTARTS}, omega: 0.9->0.4)")
 
     best_x = None
     best_f = float("inf")
     run_rows: List[Dict[str, float]] = []
+    convergence_histories: List[List[float]] = []
 
     for run_id in range(PSO_RESTARTS):
         seed = RANDOM_SEED + run_id
-        np.random.seed(seed)
         random.seed(seed)
 
-        xopt, fopt = pso(
-            objective,
-            lb,
-            ub,
+        xopt, fopt, conv_history = _run_pso_single(
+            objective, lb, ub,
             swarmsize=SWARM_SIZE,
             maxiter=MAX_ITER,
-            omega=0.7,
+            omega_start=0.9,
+            omega_end=0.4,
             phip=1.5,
             phig=1.5,
-            debug=False,
+            seed=seed,
         )
+
+        convergence_histories.append(conv_history)
 
         w_run = project_weights_with_cardinality(xopt[:n_assets], xopt[n_assets:])
         stats_run = portfolio_performance(w_run, mu, cov)
@@ -340,9 +404,10 @@ def optimize_portfolio_pso(mu_annual: pd.Series, cov_annual: pd.DataFrame) -> Tu
                 "objective": float(fopt),
                 "sharpe": float(stats_run.sharpe_ratio),
                 "return": float(stats_run.annual_return),
-                "volatility": float(stats_run.annual_volatility),
+                "vol": float(stats_run.annual_volatility),
             }
         )
+        print(f"  Run {run_id} (seed={seed}): Sharpe={stats_run.sharpe_ratio:.4f}")
 
         if fopt < best_f:
             best_f = float(fopt)
@@ -351,7 +416,7 @@ def optimize_portfolio_pso(mu_annual: pd.Series, cov_annual: pd.DataFrame) -> Tu
     assert best_x is not None
     best_w = project_weights_with_cardinality(best_x[:n_assets], best_x[n_assets:])
     print(f"PSO complete. Best objective value: {best_f:.6f}")
-    return best_w, best_f, pd.DataFrame(run_rows)
+    return best_w, best_f, pd.DataFrame(run_rows), convergence_histories
 
 
 def build_constraint_audit(weights: np.ndarray) -> Dict[str, float]:
@@ -531,6 +596,41 @@ def plot_cumulative_returns(pso_curve: pd.Series, eq_curve: pd.Series, save_path
     plt.show()
 
 
+def plot_convergence_curve(
+    convergence_histories: List[List[float]],
+    save_path: str | None = None,
+) -> None:
+    """
+    Plot PSO convergence: best Sharpe Ratio per iteration for each restart.
+
+    Why this matters:
+    - A rising then flattening curve proves PSO is learning, not guessing randomly.
+    - Multiple runs converging to similar values indicates algorithmic stability.
+    """
+    plt.figure(figsize=(10, 5))
+    colors = ["#e74c3c", "#2ecc71", "#3498db"]
+    best_run_idx = int(np.argmax([hist[-1] for hist in convergence_histories]))
+
+    for i, hist in enumerate(convergence_histories):
+        label = f"Run {i} (seed={42 + i})"
+        alpha = 1.0 if i == best_run_idx else 0.5
+        lw = 2.2 if i == best_run_idx else 1.2
+        plt.plot(range(1, len(hist) + 1), hist,
+                 color=colors[i % len(colors)],
+                 linewidth=lw, alpha=alpha,
+                 label=label + (" ← Best" if i == best_run_idx else ""))
+
+    plt.title("PSO Convergence Curve (Best Sharpe Ratio per Iteration)")
+    plt.xlabel("Iteration")
+    plt.ylabel("Best Sharpe Ratio")
+    plt.legend()
+    plt.grid(alpha=0.25)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+    plt.show()
+
+
 # =============================
 # 6) Main workflow
 # =============================
@@ -555,7 +655,7 @@ def main() -> None:
     cov_train = train_returns.cov() * TRADING_DAYS
 
     # Step C: Optimize with PSO on training set
-    pso_w, pso_objective, run_history_df = optimize_portfolio_pso(mu_train, cov_train)
+    pso_w, pso_objective, run_history_df, convergence_histories = optimize_portfolio_pso(mu_train, cov_train)
 
     # Step D: Benchmark (Equal Weight)
     eq_w = build_equal_weight(n_assets)
@@ -642,6 +742,14 @@ def main() -> None:
         ]
     ).to_csv("outputs/metrics_summary.csv", index=False)
 
+    # Step H-extra: Export convergence history
+    max_len = max(len(h) for h in convergence_histories)
+    conv_df = pd.DataFrame(
+        {f"run_{i}_sharpe": h + [h[-1]] * (max_len - len(h)) for i, h in enumerate(convergence_histories)}
+    )
+    conv_df.index.name = "iteration"
+    conv_df.to_csv("outputs/convergence_history.csv")
+
     # Step I: Visualization
     plot_efficient_frontier(
         random_df,
@@ -651,6 +759,7 @@ def main() -> None:
     )
     plot_selected_weights(tickers, pso_w, save_path="outputs/selected_weights.png")
     plot_cumulative_returns(pso_curve, eq_curve, save_path="outputs/cumulative_returns.png")
+    plot_convergence_curve(convergence_histories, save_path="outputs/convergence_curve.png")
 
 
 if __name__ == "__main__":
