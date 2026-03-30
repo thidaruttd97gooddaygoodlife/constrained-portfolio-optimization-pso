@@ -21,16 +21,6 @@
 - เปรียบเทียบกับพอร์ต **Equal Weight (1/30)**
 - Backtest 1 ปีล่าสุดด้วยเงินตั้งต้น `$10,000`
 
-## Files
-- `portfolio_pso.py` : โค้ดหลักครบ Data → Optimize → Compare → Backtest → Plot
-- `requirements.txt` : dependency ที่ต้องใช้
-
-## Run
-```bash
-python -m pip install -r requirements.txt
-python portfolio_pso.py
-```
-
 ## Outputs (สำหรับรายงาน)
 สคริปต์จะสร้าง:
 1. **Efficient Frontier-like Cloud** (random constrained portfolios) + จุดพอร์ต PSO และ Equal Weight
