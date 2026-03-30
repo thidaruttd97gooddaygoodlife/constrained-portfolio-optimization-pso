@@ -21,7 +21,7 @@
 - เปรียบเทียบกับพอร์ต **Equal Weight (1/30)**
 - Backtest 1 ปีล่าสุดด้วยเงินตั้งต้น `$10,000`
 
-## Outputs (สำหรับรายงาน)
+## Outputs 
 สคริปต์จะสร้าง:
 1. **Efficient Frontier-like Cloud** (random constrained portfolios) + จุดพอร์ต PSO และ Equal Weight
 2. **Bar Chart** หุ้น 10 ตัวที่ถูกเลือกและน้ำหนัก
@@ -33,13 +33,7 @@
 - ค่า Return / Volatility / Sharpe ของพอร์ตเทียบ benchmark
 - มูลค่าท้ายพอร์ตจาก Backtest
 
-และส่งออกไฟล์ประกอบรายงานใน `outputs/` เช่น:
-- `metrics_summary.csv`
-- `pso_weights.csv`
-- `constraint_audit.csv`
-- `pso_run_history.csv`
-
-## Notes for Presentation
+## Notes 
 - **Why M-V?** เป็นฐานของ Modern Portfolio Theory และใช้ Covariance ได้ชัดเจน
 - **Why PSO?** รับมือ Cardinality Constraint ได้ดีใน search space ขนาดใหญ่
 - **Expected insight**: Sharpe ของพอร์ต PSO ควรดีกว่า Equal Weight เมื่อข้อจำกัดสมจริง
