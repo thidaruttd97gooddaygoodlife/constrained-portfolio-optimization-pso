@@ -1,0 +1,11 @@
+ticker,sector,weight
+NVDA,Tech,0.171717
+LLY,Health,0.161616
+COST,Consumer,0.151515
+ABBV,Health,0.111111
+WMT,Consumer,0.111111
+JPM,Finance,0.090909
+TSLA,Tech,0.050505
+NFLX,Communication,0.050505
+MCD,Consumer,0.050505
+LIN,Utilities,0.050505
