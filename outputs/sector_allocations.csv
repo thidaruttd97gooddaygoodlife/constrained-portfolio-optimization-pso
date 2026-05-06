@@ -1,0 +1,9 @@
+sector,weight,limit,within_limit
+Consumer,0.340000,0.400000,True
+Health,0.270000,0.400000,True
+Tech,0.200000,0.400000,True
+Finance,0.090000,0.400000,True
+Communication,0.050000,0.400000,True
+Utilities,0.050000,0.400000,True
+Energy,0.000000,0.400000,True
+Industrials,0.000000,0.400000,True
