@@ -36,8 +36,8 @@
 ผลการดำเนินงานของ NSGA-II สามารถสร้างเส้น **Pareto Front** ที่มีความหนาแน่นและเรียบเนียน (Smooth Convergence) ซึ่งบ่งบอกถึงความสามารถในการหาจุดที่เหมาะสมที่สุดในทุกระดับความเสี่ยง
 
 ### 4.2 การเปรียบเทียบผลการดำเนินงาน (Backtesting)
-- **In-sample Sharpe:** 1.5473 (Optimal)
-- **Out-of-sample Sharpe:** 1.8028 (Robust)
+- **In-sample Sharpe:** 1.4754 (Optimal)
+- **Out-of-sample Sharpe:** 2.5700 (Robust)
 - **Constraint Audit:** ผ่านการตรวจสอบเงื่อนไขทุกข้อ (100% Feasibility)
 
 ---

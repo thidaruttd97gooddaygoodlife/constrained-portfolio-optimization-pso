@@ -3,7 +3,7 @@
 This project implements a research-grade Multi-Objective Portfolio Optimization system using the **NSGA-II** evolutionary algorithm. It is designed to find the optimal balance between risk and return (The Pareto Front) while strictly adhering to real-world financial constraints.
 
 ## 🏛️ Problem Statement
-The goal is to select an optimal portfolio of **10 assets** from a universe of **50 Top S&P 500 stocks** based on 10 years of historical data (~126,000 data points).
+The goal is to select an optimal portfolio of **10 assets** from a universe of **30 Top S&P 500 stocks** based on 10 years of historical data.
 
 ### Key Constraints:
 1.  **Cardinality:** Exactly 10 stocks selected.
@@ -23,8 +23,8 @@ The goal is to select an optimal portfolio of **10 assets** from a universe of *
 ---
 
 ## 📂 Project Structure
--   `portfolio_pso.py`: The core optimization engine and reporting suite.
--   `real_stock_datascience_workflow.ipynb`: A step-by-step Data Science notebook for educational use.
+-   `portfolio_nsga2.py`: The core optimization engine and reporting suite.
+-   `portfolio_nsga2_datascience_workflow.ipynb`: A step-by-step Data Science notebook for educational use.
 -   `outputs/`: Directory containing generated Pareto Front plots, cumulative return charts, and CSV performance summaries.
 
 ---

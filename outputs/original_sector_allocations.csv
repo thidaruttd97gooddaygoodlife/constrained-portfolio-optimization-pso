@@ -1,9 +1,9 @@
 sector,weight,limit,within_limit
-Consumer,0.313131,,True
-Health,0.272727,,True
-Tech,0.222222,,True
-Finance,0.090909,,True
-Communication,0.050505,,True
+Tech,0.272727,,True
+Health,0.242424,,True
+Consumer,0.222222,,True
+Communication,0.111111,,True
+Finance,0.050505,,True
+Industrials,0.050505,,True
 Utilities,0.050505,,True
 Energy,0.000000,,True
-Industrials,0.000000,,True

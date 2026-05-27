@@ -1,5 +1,5 @@
 """
-Research-grade constrained portfolio optimization using Self-Adaptive PSO.
+Research-grade constrained portfolio optimization using Self-Adaptive NSGA2.
 
 This module is intentionally written as a readable end-to-end reference for the project.
 The code is organized so that each step can be explained in class without hand-waving:
@@ -10,12 +10,12 @@ The code is organized so that each step can be explained in class without hand-w
 4. Use a custom Particle Swarm Optimization loop to maximize the Sharpe ratio.
 5. Enforce realistic portfolio constraints through repair rules and penalties.
 6. Compare the optimized portfolio against Equal Weight and a market benchmark.
-7. Compare the sector-constrained solution against an original unconstrained PSO variant.
+7. Compare the sector-constrained solution against an original unconstrained NSGA2 variant.
 8. Export plots, CSV tables, and Thai presentation/report text files.
 
 The file exposes two main entry points:
 - PortfolioOptimizer: runs one scenario, such as the sector-constrained portfolio.
-- run_full_study: runs both the original PSO and the sector-constrained PSO,
+- run_full_study: runs both the original NSGA2 and the sector-constrained NSGA2,
   then writes all outputs required for analysis and presentation.
 """
 
@@ -45,11 +45,14 @@ from pymoo.operators.sampling.rnd import FloatRandomSampling
 # =============================
 
 TICKERS: List[str] = [
-    "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL", "META", "BRK-B", "LLY", "AVGO", "TSLA",
-    "JPM", "UNH", "V", "XOM", "MA", "JNJ", "PG", "HD", "COST", "ABBV",
-    "MRK", "BAC", "CVX", "CRM", "ADBE", "KO", "PEP", "WMT", "AMD", "NFLX",
-    "DIS", "MCD", "TMO", "CSCO", "WFC", "ACN", "ABT", "QCOM", "ORCL", "LIN",
-    "INTU", "INTC", "TXN", "AMGN", "IBM", "ISRG", "GE", "CAT", "HON", "NEE"
+    "AAPL", "MSFT", "NVDA", "GOOGL", "META", "AVGO", "CSCO",
+    "JPM", "V", "MA", "BAC", "WFC",
+    "LLY", "UNH", "JNJ", "ABBV", "MRK",
+    "XOM", "CVX",
+    "PG", "HD", "COST", "KO", "PEP",
+    "GE", "CAT",
+    "NFLX", "DIS",
+    "LIN", "NEE"
 ]
 
 SECTOR_MAP: Dict[str, str] = {
@@ -108,7 +111,7 @@ MAX_SECTOR_WEIGHT = 0.40
 ACTIVE_THRESHOLD = 1e-6
 SWARM_SIZE = 100
 MAX_ITER = 300
-PSO_RESTARTS = 5
+NSGA2_RESTARTS = 5
 INERTIA_START = 0.90
 INERTIA_END = 0.40
 COGNITIVE_COEFF = 1.50
@@ -144,7 +147,7 @@ class ExperimentArtifacts:
     metrics_summary: pd.DataFrame
     run_history_df: pd.DataFrame
     convergence_history_df: pd.DataFrame
-    pso_curve: pd.Series
+    nsga2_curve: pd.Series
     equal_curve: pd.Series
     benchmark_curve: pd.Series | None
 
@@ -217,15 +220,15 @@ class PortfolioOptimizer:
 
     A scenario is defined by one key modeling choice: whether a sector concentration cap is active.
     For example:
-    - experiment_name="PSO_original", max_sector_weight=None
-    - experiment_name="PSO_with_sector_constraints", max_sector_weight=0.40
+    - experiment_name="NSGA2_original", max_sector_weight=None
+    - experiment_name="NSGA2_with_sector_constraints", max_sector_weight=0.40
 
     The class keeps all state explicit so each stage can be inspected independently.
     """
 
     def __init__(
         self,
-        experiment_name: str = "PSO_with_sector_constraints",
+        experiment_name: str = "NSGA2_with_sector_constraints",
         max_sector_weight: float | None = MAX_SECTOR_WEIGHT,
         benchmark_ticker: str = BENCHMARK_TICKER,
         frontier_random_samples: int = FRONTIER_RANDOM_SAMPLES,
@@ -245,7 +248,7 @@ class PortfolioOptimizer:
         self.active_threshold = ACTIVE_THRESHOLD
         self.swarm_size = SWARM_SIZE
         self.max_iter = MAX_ITER
-        self.restarts = PSO_RESTARTS
+        self.restarts = NSGA2_RESTARTS
         self.inertia_start = INERTIA_START
         self.inertia_end = INERTIA_END
         self.cognitive_coeff = COGNITIVE_COEFF
@@ -678,11 +681,11 @@ class PortfolioOptimizer:
             )
         return pd.DataFrame(rows).sort_values("weight", ascending=False).reset_index(drop=True)
 
-    def build_metrics_summary(self, pso_weights: np.ndarray, eq_weights: np.ndarray) -> pd.DataFrame:
-        """Build a train/test comparison table for PSO, Equal Weight, and the market benchmark."""
-        pso_train = self.portfolio_stats(self.train_returns, pso_weights, benchmark_weights=eq_weights)
+    def build_metrics_summary(self, nsga2_weights: np.ndarray, eq_weights: np.ndarray) -> pd.DataFrame:
+        """Build a train/test comparison table for NSGA2, Equal Weight, and the market benchmark."""
+        nsga2_train = self.portfolio_stats(self.train_returns, nsga2_weights, benchmark_weights=eq_weights)
         eq_train = self.portfolio_stats(self.train_returns, eq_weights, benchmark_weights=eq_weights)
-        pso_test = self.portfolio_stats(self.test_returns, pso_weights, benchmark_weights=eq_weights)
+        nsga2_test = self.portfolio_stats(self.test_returns, nsga2_weights, benchmark_weights=eq_weights)
         eq_test = self.portfolio_stats(self.test_returns, eq_weights, benchmark_weights=eq_weights)
 
         rows = [
@@ -690,13 +693,13 @@ class PortfolioOptimizer:
                 "portfolio": self.experiment_name,
                 "sample": "train",
                 "objective": float(self.best_objective),
-                "ann_return": pso_train.annual_return,
-                "ann_vol": pso_train.annual_volatility,
-                "sharpe": pso_train.sharpe_ratio,
-                "mad": pso_train.mean_absolute_deviation,
-                "max_drawdown": pso_train.max_drawdown,
-                "turnover_rate": pso_train.turnover_rate,
-                "final_value": pso_train.final_value,
+                "ann_return": nsga2_train.annual_return,
+                "ann_vol": nsga2_train.annual_volatility,
+                "sharpe": nsga2_train.sharpe_ratio,
+                "mad": nsga2_train.mean_absolute_deviation,
+                "max_drawdown": nsga2_train.max_drawdown,
+                "turnover_rate": nsga2_train.turnover_rate,
+                "final_value": nsga2_train.final_value,
             },
             {
                 "portfolio": "EqualWeight",
@@ -714,13 +717,13 @@ class PortfolioOptimizer:
                 "portfolio": self.experiment_name,
                 "sample": "test",
                 "objective": float(self.best_objective),
-                "ann_return": pso_test.annual_return,
-                "ann_vol": pso_test.annual_volatility,
-                "sharpe": pso_test.sharpe_ratio,
-                "mad": pso_test.mean_absolute_deviation,
-                "max_drawdown": pso_test.max_drawdown,
-                "turnover_rate": pso_test.turnover_rate,
-                "final_value": pso_test.final_value,
+                "ann_return": nsga2_test.annual_return,
+                "ann_vol": nsga2_test.annual_volatility,
+                "sharpe": nsga2_test.sharpe_ratio,
+                "mad": nsga2_test.mean_absolute_deviation,
+                "max_drawdown": nsga2_test.max_drawdown,
+                "turnover_rate": nsga2_test.turnover_rate,
+                "final_value": nsga2_test.final_value,
             },
             {
                 "portfolio": "EqualWeight",
@@ -772,7 +775,7 @@ class PortfolioOptimizer:
         Plot convergence with a tighter Sharpe-axis range and an explicit plateau marker.
 
         This chart answers two questions for the presentation:
-        - Does PSO really improve over time?
+        - Does NSGA2 really improve over time?
         - Around which iteration does the solution stop changing materially?
         """
         plt.figure(figsize=(11, 6))
@@ -834,14 +837,14 @@ class PortfolioOptimizer:
 
     def plot_cumulative_returns(
         self,
-        pso_curve: pd.Series,
+        nsga2_curve: pd.Series,
         eq_curve: pd.Series,
         benchmark_curve: pd.Series | None,
         save_path: str,
     ) -> None:
         """Plot out-of-sample wealth growth for the optimized portfolio and all benchmarks."""
         plt.figure(figsize=(11, 5))
-        plt.plot(pso_curve.index, pso_curve.values, label=self.experiment_name, linewidth=2.4, color="#002D62") # Navy
+        plt.plot(nsga2_curve.index, nsga2_curve.values, label=self.experiment_name, linewidth=2.4, color="#002D62") # Navy
         plt.plot(eq_curve.index, eq_curve.values, label="Equal Weight", linewidth=2.1, color="#7f7f7f") # Gray
         if benchmark_curve is not None:
             plt.plot(benchmark_curve.index, benchmark_curve.values, label=self.benchmark_ticker, linewidth=2.0, color="#FFC000") # Gold
@@ -885,7 +888,7 @@ class PortfolioOptimizer:
     def plot_efficient_frontier(
         self,
         random_df: pd.DataFrame,
-        pso_stats: PortfolioStats,
+        nsga2_stats: PortfolioStats,
         eq_stats: PortfolioStats,
         save_path: str,
     ) -> None:
@@ -901,7 +904,7 @@ class PortfolioOptimizer:
             label=f"Random feasible portfolios ({len(random_df):,})",
         )
         plt.colorbar(scatter, label="Sharpe Ratio")
-        plt.scatter(pso_stats.annual_volatility, pso_stats.annual_return, marker="*", color="red", s=280, label=self.experiment_name)
+        plt.scatter(nsga2_stats.annual_volatility, nsga2_stats.annual_return, marker="*", color="red", s=280, label=self.experiment_name)
         plt.scatter(eq_stats.annual_volatility, eq_stats.annual_return, marker="X", color="black", s=180, label="Equal Weight")
         plt.title("Efficient Frontier Approximation with Random Feasible Portfolios")
         plt.xlabel("Annual Volatility")
@@ -922,13 +925,13 @@ class PortfolioOptimizer:
         prefix = f"{file_prefix}_" if file_prefix else ""
         output_path = Path(output_dir)
 
-        artifacts.weights_table.to_csv(output_path / f"{prefix}pso_weights.csv", index=False, float_format="%.6f")
+        artifacts.weights_table.to_csv(output_path / f"{prefix}nsga2_weights.csv", index=False, float_format="%.6f")
         artifacts.constraint_audit.to_csv(output_path / f"{prefix}constraint_audit.csv", index=False, float_format="%.6f")
         artifacts.metrics_summary.to_csv(output_path / f"{prefix}metrics_summary.csv", index=False, float_format="%.6f")
         artifacts.sector_table.to_csv(output_path / f"{prefix}sector_allocations.csv", index=False, float_format="%.6f")
-        artifacts.run_history_df.to_csv(output_path / f"{prefix}pso_run_history.csv", index=False, float_format="%.6f")
+        artifacts.run_history_df.to_csv(output_path / f"{prefix}nsga2_run_history.csv", index=False, float_format="%.6f")
         artifacts.convergence_history_df.to_csv(output_path / f"{prefix}convergence_history.csv", index=False, float_format="%.6f")
-        artifacts.pso_curve.to_frame(name="portfolio_value").to_csv(output_path / f"{prefix}pso_backtest_curve.csv", float_format="%.6f")
+        artifacts.nsga2_curve.to_frame(name="portfolio_value").to_csv(output_path / f"{prefix}nsga2_backtest_curve.csv", float_format="%.6f")
         artifacts.equal_curve.to_frame(name="portfolio_value").to_csv(output_path / f"{prefix}equal_backtest_curve.csv", float_format="%.6f")
         if artifacts.benchmark_curve is not None:
             artifacts.benchmark_curve.to_frame(name="portfolio_value").to_csv(
@@ -936,13 +939,13 @@ class PortfolioOptimizer:
             )
 
         random_df = self.simulate_random_constrained_portfolios()
-        pso_train_stats = self.portfolio_stats(self.train_returns, artifacts.weights, benchmark_weights=self.build_equal_weight())
+        nsga2_train_stats = self.portfolio_stats(self.train_returns, artifacts.weights, benchmark_weights=self.build_equal_weight())
         eq_train_stats = self.portfolio_stats(self.train_returns, self.build_equal_weight(), benchmark_weights=self.build_equal_weight())
 
         self.plot_convergence_curve(artifacts.convergence_history_df, str(output_path / f"{prefix}convergence_curve.png"))
         self.plot_selected_weights(artifacts.weights_table, str(output_path / f"{prefix}selected_weights.png"))
-        self.plot_cumulative_returns(artifacts.pso_curve, artifacts.equal_curve, artifacts.benchmark_curve, str(output_path / f"{prefix}cumulative_returns.png"))
-        self.plot_efficient_frontier(random_df, pso_train_stats, eq_train_stats, str(output_path / f"{prefix}efficient_frontier.png"))
+        self.plot_cumulative_returns(artifacts.nsga2_curve, artifacts.equal_curve, artifacts.benchmark_curve, str(output_path / f"{prefix}cumulative_returns.png"))
+        self.plot_efficient_frontier(random_df, nsga2_train_stats, eq_train_stats, str(output_path / f"{prefix}efficient_frontier.png"))
         self.plot_pareto_front(str(output_path / f"{prefix}pareto_front.png"))
 
     def print_report(self, artifacts: ExperimentArtifacts) -> None:
@@ -985,20 +988,20 @@ class PortfolioOptimizer:
             self.download_adjusted_close()
         self.prepare_inputs()
 
-        pso_weights, objective, run_history_df, convergence_history_df = self.optimize()
+        nsga2_weights, objective, run_history_df, convergence_history_df = self.optimize()
         eq_weights = self.build_equal_weight()
 
-        weights_table = self.build_weights_table(pso_weights)
-        sector_table = self.build_sector_table(pso_weights)
-        constraint_audit = self.build_constraint_audit(pso_weights)
-        metrics_summary = self.build_metrics_summary(pso_weights, eq_weights)
-        pso_curve = self.backtest_cumulative_value(self.test_returns, pso_weights)
+        weights_table = self.build_weights_table(nsga2_weights)
+        sector_table = self.build_sector_table(nsga2_weights)
+        constraint_audit = self.build_constraint_audit(nsga2_weights)
+        metrics_summary = self.build_metrics_summary(nsga2_weights, eq_weights)
+        nsga2_curve = self.backtest_cumulative_value(self.test_returns, nsga2_weights)
         equal_curve = self.backtest_cumulative_value(self.test_returns, eq_weights)
         benchmark_curve = self.benchmark_cumulative_value()
 
         artifacts = ExperimentArtifacts(
             experiment_name=self.experiment_name,
-            weights=pso_weights,
+            weights=nsga2_weights,
             objective=objective,
             weights_table=weights_table,
             sector_table=sector_table,
@@ -1006,7 +1009,7 @@ class PortfolioOptimizer:
             metrics_summary=metrics_summary,
             run_history_df=run_history_df,
             convergence_history_df=convergence_history_df,
-            pso_curve=pso_curve,
+            nsga2_curve=nsga2_curve,
             equal_curve=equal_curve,
             benchmark_curve=benchmark_curve,
         )
@@ -1067,8 +1070,8 @@ def plot_bonus_constraint_effect(
 
     sector_df = pd.DataFrame(
         {
-            "Original PSO": original_sector,
-            "Sector-Constrained PSO": constrained_sector,
+            "Original NSGA2": original_sector,
+            "Sector-Constrained NSGA2": constrained_sector,
         }
     )
     sector_df.plot(kind="bar", ax=axes[1], rot=0)
@@ -1090,7 +1093,7 @@ def write_presentation_script(
     bonus_df: pd.DataFrame,
     output_path: str,
 ) -> None:
-    """Write an academic Thai presentation script for MOPSO."""
+    """Write an academic Thai presentation script for MONSGA2."""
     constrained_test = constrained_artifacts.metrics_summary.query("portfolio == @constrained_artifacts.experiment_name and sample == 'test'").iloc[0]
     equal_test = constrained_artifacts.metrics_summary.query("portfolio == 'EqualWeight' and sample == 'test'").iloc[0]
     
@@ -1156,7 +1159,7 @@ def write_detailed_report(
     bonus_df: pd.DataFrame,
     output_path: str,
 ) -> None:
-    """Write a detailed Thai report for the MOPSO study."""
+    """Write a detailed Thai report for the MONSGA2 study."""
     constrained_test = constrained_artifacts.metrics_summary.query("portfolio == @constrained_artifacts.experiment_name and sample == 'test'").iloc[0]
     equal_test = constrained_artifacts.metrics_summary.query("portfolio == 'EqualWeight' and sample == 'test'").iloc[0]
     best_run = constrained_artifacts.run_history_df.sort_values("sharpe", ascending=False).iloc[0]
@@ -1217,7 +1220,7 @@ def run_full_study(output_dir: str = "outputs") -> Dict[str, object]:
     output_path.mkdir(parents=True, exist_ok=True)
 
     constrained_optimizer = PortfolioOptimizer(
-        experiment_name="PSO_with_sector_constraints",
+        experiment_name="NSGA2_with_sector_constraints",
         max_sector_weight=MAX_SECTOR_WEIGHT,
         benchmark_ticker=BENCHMARK_TICKER,
         frontier_random_samples=FRONTIER_RANDOM_SAMPLES,
@@ -1226,7 +1229,7 @@ def run_full_study(output_dir: str = "outputs") -> Dict[str, object]:
     constrained_optimizer.save_outputs(constrained_artifacts, output_dir=output_dir, file_prefix="")
 
     original_optimizer = PortfolioOptimizer(
-        experiment_name="PSO_original",
+        experiment_name="NSGA2_original",
         max_sector_weight=None,
         benchmark_ticker=BENCHMARK_TICKER,
         frontier_random_samples=FRONTIER_RANDOM_SAMPLES,

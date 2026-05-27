@@ -1,2 +1,2 @@
 sum_weights,max_weight,active_count,min_active_weight,budget_ok,boundary_ok,cardinality_ok,buyin_ok,sector_ok,sector_tech,sector_energy,sector_finance,sector_health,sector_consumer,sector_industrials,sector_communication,sector_utilities
-1.000000,0.171717,10,0.050505,True,True,True,True,True,0.222222,0.000000,0.090909,0.272727,0.313131,0.000000,0.050505,0.050505
+1.000000,0.181818,10,0.050505,True,True,True,True,True,0.272727,0.000000,0.050505,0.242424,0.222222,0.050505,0.111111,0.050505

@@ -1,3 +1,3 @@
 scenario,ann_return_test,ann_vol_test,sharpe_test,max_drawdown_test,top_sector_weight
-PSO_original,0.231554,0.126016,1.678782,-0.073122,0.313131
-PSO_with_sector_constraints,0.242842,0.123612,1.802755,-0.071639,0.340000
+NSGA2_original,0.286297,0.129642,2.054097,-0.074480,0.272727
+NSGA2_with_sector_constraints,0.347746,0.127526,2.570028,-0.072191,0.280000
