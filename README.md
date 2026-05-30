@@ -1,4 +1,4 @@
-# 🚀 Advanced Portfolio Optimization using NSGA-II
+# 🚀 Multi-Objective Portfolio Optimization under Realistic Constraints using NSGA-II
 
 This project implements a research-grade Multi-Objective Portfolio Optimization system using the **NSGA-II** evolutionary algorithm. It is designed to find the optimal balance between risk and return (The Pareto Front) while strictly adhering to real-world financial constraints.
 
@@ -29,9 +29,13 @@ The goal is to select an optimal portfolio of **10 assets** from a universe of *
 
 ---
 
-
-## 📊 Key Results
-The model successfully identifies the **Tangency Portfolio** (Max Sharpe) on the **Pareto Front**, significantly outperforming the Equal Weight benchmark in out-of-sample testing while maintaining 100% constraint feasibility.
+---
+## 📊 Results
+-  Maximized Risk-Adjusted Returns to achieve a high Sharpe Ratio of 2.57 and minimized risk 
+with a -7.2% Max Drawdown, outperforming S&P 500 and Equal-Weight benchmarks.
+-  Delivered Robust Out-of-Sample Growth, boosting portfolio value to $14,041 (+$4,041 net profit) 
+over a 1-year market backtest.
+---
 
 ---
-*Created for the Computational Intelligence Final Project (2026).*
+*Created for the Computational Intelligence Project (2026).*
